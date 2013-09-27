@@ -544,9 +544,9 @@ allium_ptcfg_smethod_report(const allium_ptcfg *cfg, const char *method,
 		    addr_len))
 		fprintf(stdout, " FORWARD:1");
 	if (NULL != args)
-		fprintf(stdout, " ARGS=%s", args);
+		fprintf(stdout, " ARGS:%s", args);
 	if (NULL != declare)
-		fprintf(stdout, " DECLARE=%s", declare);
+		fprintf(stdout, " DECLARE:%s", declare);
 	if (ext_port)
 		fprintf(stdout, " USE-EXTENDED-PORT:1");
 	fprintf(stdout, "\n");
