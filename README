@@ -31,9 +31,10 @@ Notes:
    be used.
 
 Known gotchas:
- * allium_ptcfg_state_dir() will probably misbehave if the PT state directory
-   path name is non-ASCII.  This behavior is not considered a bug as enviornment
-   variable values are NULL terminated by definiton (See IEEE Std. 1003.1 8.1).
+ * allium_ptcfg_state_dir()/allium_ptcfg_auth_cookie_file() will probably
+   misbehave if the paths are non-ASCII.  This behavior is not considered a bug
+   as enviornment variable values are NULL terminated by definiton (See IEEE
+   Std. 1003.1 8.1).
  * tests/ptcfg_test.c depends on inet_pton so it won't run on ancient systems.
    A notable one would be WinXP.  This probably won't be fixed.
 
