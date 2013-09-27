@@ -16,8 +16,7 @@ liballium embeds the following third party codebases:
  * sput (unit test framework, included in tests only)
 
 Specs implemented:
- * https://gitweb.torproject.org/torspec.git/blob/HEAD:/proposals/
-   180-pluggable-transport.txt
+ * https://gitweb.torproject.org/torspec.git/blob/HEAD:/pt-spec.txt
  * (TODO) https://gitweb.torproject.org/torspec.git/blob/HEAD:/proposals/
    196-transport-control-ports.txt
 

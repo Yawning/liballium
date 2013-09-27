@@ -510,8 +510,7 @@ allium_ptcfg_cmethod_report(const allium_ptcfg *cfg, const char *method,
 
 int
 allium_ptcfg_smethod_report(const allium_ptcfg *cfg, const char *method,
-    const struct sockaddr *addr, socklen_t addr_len, const char
-    *args, const char *declare, int ext_port)
+    const struct sockaddr *addr, socklen_t addr_len, const char *args)
 {
 	struct allium_ptcfg_method_s *m;
 	char host[INET6_ADDRSTRLEN];
@@ -540,15 +539,8 @@ allium_ptcfg_smethod_report(const allium_ptcfg *cfg, const char *method,
 		fprintf(stdout, "%s:%s", host, service);
 	else if (AF_INET6 == addr->sa_family)
 		fprintf(stdout, "[%s]:%s", host, service);
-	if ((m->bind_addr_len != addr_len) || memcmp(&m->bind_addr, addr,
-		    addr_len))
-		fprintf(stdout, " FORWARD:1");
 	if (NULL != args)
 		fprintf(stdout, " ARGS:%s", args);
-	if (NULL != declare)
-		fprintf(stdout, " DECLARE:%s", declare);
-	if (ext_port)
-		fprintf(stdout, " USE-EXTENDED-PORT:1");
 	fprintf(stdout, "\n");
 
 	return (0);

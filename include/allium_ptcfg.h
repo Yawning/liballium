@@ -62,8 +62,7 @@ int allium_ptcfg_cmethod_report(const allium_ptcfg *cfg, const char *method,
     int socks_ver, const struct sockaddr *addr,
     socklen_t addr_len, const char *args, const char *opt_args);
 int allium_ptcfg_smethod_report(const allium_ptcfg *cfg, const char *method,
-    const struct sockaddr *addr, socklen_t addr_len, const char
-    *args, const char *declare, int ext_port);
+    const struct sockaddr *addr, socklen_t addr_len, const char *args);
 int allium_ptcfg_method_error(const allium_ptcfg *cfg, const char *method,
     const char *msg);
 int allium_ptcfg_methods_done(const allium_ptcfg *cfg);

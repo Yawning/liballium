@@ -821,40 +821,39 @@ ptcfg_smethod_report_test(void)
 
 	/* Invalid arguments */
 	rval = allium_ptcfg_smethod_report(NULL, "foo",
-	    (struct sockaddr *)&v4addr, sizeof(v4addr), NULL,
-	    NULL, 0);
+	    (struct sockaddr *)&v4addr, sizeof(v4addr), NULL);
 	sput_fail_unless(ALLIUM_ERR_INVAL == rval,
 	    "rval == ALLIUM_ERR_INVAL, NULL config");
 	rval = allium_ptcfg_smethod_report(cfg, NULL, (struct sockaddr *)
-	    &v4addr, sizeof(v4addr), NULL, NULL, 0);
+	    &v4addr, sizeof(v4addr), NULL);
 	sput_fail_unless(ALLIUM_ERR_INVAL == rval,
 	    "rval == ALLIUM_ERR_INVAL, NULL method");
 	rval = allium_ptcfg_smethod_report(cfg, "foo", NULL, sizeof(v4addr),
-	    NULL, NULL, 0);
+	    NULL);
 	sput_fail_unless(ALLIUM_ERR_INVAL == rval,
 	    "rval == ALLIUM_ERR_INVAL, NULL addr");
 	v4addr.sin_family = AF_APPLETALK; /* Temporarily change this */
 	rval = allium_ptcfg_smethod_report(cfg, "foo", (struct sockaddr *)
-	    &v4addr, sizeof(v4addr), NULL, NULL, 0);
+	    &v4addr, sizeof(v4addr), NULL);
 	sput_fail_unless(ALLIUM_ERR_INVAL == rval,
 	    "rval == ALLIUM_ERR_INVAL, Invalid addr");
 	v4addr.sin_family = AF_INET;
 
 	/* Unspecified method */
 	rval = allium_ptcfg_smethod_report(cfg, "qux", (struct sockaddr *)
-	    &v4addr, sizeof(v4addr), NULL, NULL, 0);
+	    &v4addr, sizeof(v4addr), NULL);
 	sput_fail_unless(ALLIUM_ERR_PTCFG_INVALID_METHOD == rval,
 	    "rval == ALLIUM_ERR_PTCFG_INVALID_METHOD, Invalid method");
 
 	/* Valid args */
 	rval = allium_ptcfg_smethod_report(cfg, "foo", (struct sockaddr *)
-	    &v4addr, sizeof(v4addr), "myargs", "mydeclare", 0);
+	    &v4addr, sizeof(v4addr), "myargs");
 	sput_fail_unless(0 == rval, "rval == 0, Valid IPv4 address");
 	rval = allium_ptcfg_smethod_report(cfg, "bar", (struct sockaddr *)
-	    &v6addr, sizeof(v6addr), "myargs", "mydeclare", 0);
+	    &v6addr, sizeof(v6addr), "myargs");
 	sput_fail_unless(0 == rval, "rval == 0, Valid IPv6 address");
 	rval = allium_ptcfg_smethod_report(cfg, "baz", (struct sockaddr *)
-	    &v6addr, sizeof(v6addr), "myargs", "mydeclare", 1);
+	    &v6addr, sizeof(v6addr), "myargs");
 	sput_fail_unless(0 == rval, "rval == 0, Different address");
 
 	allium_ptcfg_free(cfg);
@@ -863,11 +862,11 @@ ptcfg_smethod_report_test(void)
 	cfg = allium_ptcfg_init();
 	assert(cfg);
 
-	/* Server config */
+	/* Client config */
 	rval = allium_ptcfg_smethod_report(cfg, "foo", (struct sockaddr *)
-	    &v4addr, sizeof(v4addr), "myargs", "mydeclare", 0);
+	    &v4addr, sizeof(v4addr), "myargs");
 	sput_fail_unless(ALLIUM_ERR_PTCFG_NOT_SERVER == rval,
-	    "rval == ALLIUM_ERR_PTCFG_NOT_SERVER, Server config");
+	    "rval == ALLIUM_ERR_PTCFG_NOT_SERVER, Client config");
 
 	allium_ptcfg_free(cfg);
 }

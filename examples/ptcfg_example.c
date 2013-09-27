@@ -184,14 +184,12 @@ ptserver_init(allium_ptcfg *cfg)
 
 	/*
 	 * Inform Tor about the address we are accepting connections on,
-	 * whatever arguments that should be listed in the extra-info
-	 * descriptor, and if we are going to use the extended_server port.
-	 *
-	 * Note: The "declare" field is currently unimplemented in Tor.
+	 * and whatever arguments that should be listed in the extra-info
+	 * document.
 	 */
 
 	allium_ptcfg_smethod_report(cfg, METHOD_NAME, (struct sockaddr *)
-	    &bindaddr, addr_len, "rocks=5,height=100m", NULL, 0);
+	    &bindaddr, addr_len, "rocks=5,height=100m");
 
 	return (0);
 }
