@@ -340,10 +340,12 @@ allium_ptcfg_free(allium_ptcfg *cfg)
 		return;
 
 	bdestroy(cfg->version);
+	bdestroy(cfg->state_location);
 	if (NULL != cfg->methods) {
 		for (i = 0; i < cfg->nr_methods; i++) {
 			bdestroy(cfg->methods[i].name);
 		}
+		free(cfg->methods);
 	}
 
 	free(cfg);
