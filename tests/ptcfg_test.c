@@ -51,6 +51,7 @@ static void ptcfg_method_requested_test(void);
 static void ptcfg_or_port_test(void);
 static void ptcfg_ext_port_test(void);
 static void ptcfg_bind_addr_test(void);
+static void ptcfg_auth_cookie_file_test(void);
 
 static void ptcfg_cmethod_report_test(void);
 static void ptcfg_smethod_report_test(void);
@@ -80,25 +81,28 @@ main(int argc, char *argv[])
 	sput_enter_suite("allium_ptcfg_method_requested(): Method requested");
 	sput_run_test(ptcfg_method_requested_test);
 
-	sput_enter_suite("allium_ptcfg_or_port_test(): OR Port");
+	sput_enter_suite("allium_ptcfg_or_port(): OR Port");
 	sput_run_test(ptcfg_or_port_test);
 
-	sput_enter_suite("allium_ptcfg_ext_port_test(): Ext Port");
+	sput_enter_suite("allium_ptcfg_ext_port(): Ext Port");
 	sput_run_test(ptcfg_ext_port_test);
 
-	sput_enter_suite("allium_ptcfg_bind_addr_test(): Bind Addr");
+	sput_enter_suite("allium_ptcfg_bind_addr(): Bind Addr");
 	sput_run_test(ptcfg_bind_addr_test);
 
-	sput_enter_suite("allium_ptcfg_cmethod_report_test(): Cmethod");
+	sput_enter_suite("allium_ptcfg_auth_cookie_file(): Auth Cookie");
+	sput_run_test(ptcfg_auth_cookie_file_test);
+
+	sput_enter_suite("allium_ptcfg_cmethod_report(): Cmethod");
 	sput_run_test(ptcfg_cmethod_report_test);
 
-	sput_enter_suite("allium_ptcfg_smethod_report_test(): Smethod");
+	sput_enter_suite("allium_ptcfg_smethod_report(): Smethod");
 	sput_run_test(ptcfg_smethod_report_test);
 
-	sput_enter_suite("allium_ptcfg_method_error_test(): Method Error");
+	sput_enter_suite("allium_ptcfg_method_error(): Method Error");
 	sput_run_test(ptcfg_method_error_test);
 
-	sput_enter_suite("allium_ptcfg_methods_done_test(): Methods Done");
+	sput_enter_suite("allium_ptcfg_methods_done(): Methods Done");
 	sput_run_test(ptcfg_methods_done_test);
 
 	sput_finish_testing();
@@ -127,6 +131,7 @@ ptcfg_test_server(void)
 	putenv("TOR_PT_ORPORT=127.0.0.1:9001");
 	putenv("TOR_PT_EXTENDED_SERVER_PORT=127.0.0.1:9002");
 	putenv("TOR_PT_SERVER_BINDADDR=foo-127.0.0.1:69,bar-[::1]:23,baz-127.0.0.1:22");
+	putenv("TOR_PT_AUTH_COOKIE_FILE=/tmp/chcolate-chip");
 }
 
 
@@ -374,6 +379,24 @@ ptcfg_init_server_test(void)
 	putenv("TOR_PT_SERVER_BINDADDR=foo-127.0.0.1:69,bar-[::1]:23,baz-127.0.0.1:22");
 	cfg = allium_ptcfg_init();
 	sput_fail_unless(NULL != cfg, "cfg != NULL, 3 Valid address");
+	if (cfg)
+		allium_ptcfg_free(cfg);
+
+	/*
+	 * Auth cookie tests
+	 */
+
+	/* Empty auth cookie */
+	putenv("TOR_PT_AUTH_COOKIE_FILE=");
+	cfg = allium_ptcfg_init();
+	sput_fail_unless(NULL != cfg, "cfg != NULL, Empty cookie");
+	if (cfg)
+		allium_ptcfg_free(cfg);
+
+	/* Valid auth cookie */
+	putenv("TOR_PT_AUTH_COOKIE_FILE=/tmp/chcolate-chip");
+	cfg = allium_ptcfg_init();
+	sput_fail_unless(NULL != cfg, "cfg != NULL, Valid cookie");
 	if (cfg)
 		allium_ptcfg_free(cfg);
 }
@@ -713,6 +736,66 @@ ptcfg_bind_addr_test(void)
 	sput_fail_unless(0 == rval, "rval == 0, Valid IPv6 address");
 	sput_fail_unless(0 == memcmp(&v6addr, &cmp_v6addr, len),
 	    "v6addr matches");
+
+	allium_ptcfg_free(cfg);
+}
+
+
+static void
+ptcfg_auth_cookie_file_test(void)
+{
+	static const char cookie[] = "/tmp/chocolate-chip";
+	char buf[1024];
+	size_t len;
+	allium_ptcfg *cfg;
+	int rval;
+
+	ptcfg_test_server();
+	setenv("TOR_PT_AUTH_COOKIE_FILE", cookie, 1);
+	cfg = allium_ptcfg_init();
+	assert(cfg);
+
+	/* Invalid arguments */
+	len = sizeof(buf);
+	rval = allium_ptcfg_auth_cookie_file(NULL, buf, &len);
+	sput_fail_unless(ALLIUM_ERR_INVAL == rval,
+	    "rval == ALLIUM_ERR_INVAL, Invalid config");
+	rval = allium_ptcfg_auth_cookie_file(cfg, buf, NULL);
+	sput_fail_unless(ALLIUM_ERR_INVAL == rval,
+	    "rval == ALLIUM_ERR_INVAL, Invalid length");
+
+	/* Buffer NULL/Too small */
+	len = sizeof(buf);
+	rval = allium_ptcfg_auth_cookie_file(cfg, NULL, &len);
+	sput_fail_unless(ALLIUM_ERR_NOBUFS == rval,
+	    "rval == ALLIUM_ERR_NOBUFS, NULL buffer");
+	sput_fail_unless(strlen(cookie) + 1 == len,
+	    "len == strlen(cookie) + 1, NULL buffer");
+	len = 3; /* Something too short */
+	rval = allium_ptcfg_auth_cookie_file(cfg, buf, &len);
+	sput_fail_unless(ALLIUM_ERR_NOBUFS == rval,
+	    "rval == ALLIUM_ERR_NOBUFS, Length too small");
+	sput_fail_unless(len == strlen(cookie) + 1,
+	    "len == strlen(cookie) + 1, Length too small");
+
+	/* Valid arguments */
+	buf[0] = '\0';
+	len = sizeof(buf);
+	rval = allium_ptcfg_auth_cookie_file(cfg, buf, &len);
+	sput_fail_unless(0 == rval, "rval == 0, Valid args");
+	sput_fail_unless(0 == strcmp(buf, cookie), "Correct cookie");
+	sput_fail_unless(len == strlen(cookie) + 1, "Correct length");
+
+	allium_ptcfg_free(cfg);
+
+	/* No auth cookie */
+	unsetenv("TOR_PT_AUTH_COOKIE_FILE");
+	cfg = allium_ptcfg_init();
+	assert(cfg);
+
+	rval = allium_ptcfg_auth_cookie_file(cfg, buf, &len);
+	sput_fail_unless(ALLIUM_ERR_PTCFG_NO_AUTH_COOKIE == rval,
+	    "rval == ALLIUM_ERR_PTCFG_NO_AUTH_COOKIE, No cookie");
 
 	allium_ptcfg_free(cfg);
 }

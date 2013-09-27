@@ -124,11 +124,14 @@ static int
 ptserver_init(allium_ptcfg *cfg)
 {
 	/* Server related config options */
+	char auth_cookie[1024];
+	size_t cookie_len;
 	struct sockaddr_in orport;
 	struct sockaddr_in extport;
 	struct sockaddr_storage bindaddr;
 	socklen_t addr_len;
 	int has_extport = 1;
+	int has_auth_cookie = 1;
 	int has_bindaddr = 1;
 	int rval;
 
@@ -149,6 +152,30 @@ ptserver_init(allium_ptcfg *cfg)
 	} else if (rval) {
 		allium_ptcfg_method_error(cfg, METHOD_NAME, "Failed to query ExtPort");
 		return (-1);
+	}
+
+	/*
+	 * Tor's Extended Server Port Auth Cookie
+	 *
+	 * Note:
+	 *  * Only need to check this if there is a Ext. Port
+	 */
+	if (has_extport) {
+		/*
+		 * Might as well show off the other way to get strings out of
+		 * the ptcfg module (You can use the same pattern with the
+		 * state_dir.
+		 */
+		cookie_len = sizeof(auth_cookie);
+		rval = allium_ptcfg_auth_cookie_file(cfg, auth_cookie,
+		    &cookie_len);
+		if (ALLIUM_ERR_PTCFG_NO_AUTH_COOKIE == rval)
+			has_auth_cookie = 0;
+		else if (rval) {
+			/* rval is 99% ALLIUM_ERR_NOBUFS, but too lazy */
+			allium_ptcfg_method_error(cfg, METHOD_NAME, "Failed to query cookie");
+			return (-1);
+		}
 	}
 
 	/* The address that Tor expects us to listen on */
@@ -173,6 +200,7 @@ ptserver_init(allium_ptcfg *cfg)
 	 */
 
 	(void)has_extport;      /* Shut GCC up, you should use these though! */
+	(void)has_auth_cookie;
 	(void)has_bindaddr;
 
 #if 0

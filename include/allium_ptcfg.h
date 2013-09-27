@@ -43,6 +43,7 @@ typedef struct allium_ptcfg_s   allium_ptcfg;
 #define ALLIUM_ERR_PTCFG_NOT_SERVER		(-(ALLIUM_ERR_PTCFG | 2))
 #define ALLIUM_ERR_PTCFG_INVALID_METHOD		(-(ALLIUM_ERR_PTCFG | 3))
 #define ALLIUM_ERR_PTCFG_NO_ADDRESS		(-(ALLIUM_ERR_PTCFG | 4))
+#define ALLIUM_ERR_PTCFG_NO_AUTH_COOKIE		(-(ALLIUM_ERR_PTCFG | 5))
 
 allium_ptcfg *allium_ptcfg_init(void);
 void allium_ptcfg_free(allium_ptcfg *cfg);
@@ -57,6 +58,8 @@ int allium_ptcfg_ext_port(const allium_ptcfg *cfg, struct sockaddr *addr,
     socklen_t *addr_len);
 int allium_ptcfg_bind_addr(const allium_ptcfg *cfg, const char *method, struct
     sockaddr *addr, socklen_t *addr_len);
+int allium_ptcfg_auth_cookie_file(const allium_ptcfg *cfg, char *path, size_t
+    *path_len);
 
 int allium_ptcfg_cmethod_report(const allium_ptcfg *cfg, const char *method,
     int socks_ver, const struct sockaddr *addr,

@@ -42,6 +42,7 @@
 #define PTCFG_ORPORT			"TOR_PT_ORPORT"
 #define PTCFG_SERVER_BIND_ADDR		"TOR_PT_SERVER_BINDADDR"
 #define PTCFG_SERVER_TRANSPORTS		"TOR_PT_SERVER_TRANSPORTS"
+#define PTCFG_AUTH_COOKIE_FILE		"TOR_PT_AUTH_COOKIE_FILE"
 
 #define PTCFG_MANAGED_TRANSPORT_V1	"1"
 #define PTCFG_ALL_TRANSPORTS		"*"
@@ -58,6 +59,7 @@ struct allium_ptcfg_method_s {
 struct allium_ptcfg_s {
 	bstring				version;
 	bstring				state_location;
+	bstring				auth_cookie_file;
 
 	struct allium_ptcfg_method_s *	methods;
 	int				nr_methods;
@@ -323,6 +325,21 @@ done_bindaddrs_iter:
 		return (NULL);
 	}
 
+	/* Handle the ext port auth cookie */
+	do {
+		char *cookie_file = getenv(PTCFG_AUTH_COOKIE_FILE);
+
+		if (NULL == cookie_file)
+			break;
+
+		cfg->auth_cookie_file = bfromcstr(cookie_file);
+		if (NULL == cfg->auth_cookie_file) {
+			fprintf(stdout, "ENV-ERROR OOM parsing Auth Cookie File\n");
+			allium_ptcfg_free(cfg);
+			return (NULL);
+		}
+	} while (0);
+
 done:
 	/* Report back that a compatible PT version has been found */
 	fprintf(stdout, "VERSION %s\n", bdata(cfg->version));
@@ -341,6 +358,7 @@ allium_ptcfg_free(allium_ptcfg *cfg)
 
 	bdestroy(cfg->version);
 	bdestroy(cfg->state_location);
+	bdestroy(cfg->auth_cookie_file);
 	if (NULL != cfg->methods) {
 		for (i = 0; i < cfg->nr_methods; i++) {
 			bdestroy(cfg->methods[i].name);
@@ -455,6 +473,34 @@ allium_ptcfg_bind_addr(const allium_ptcfg *cfg, const char *method, struct
 	}
 	memcpy(addr, &m->bind_addr, m->bind_addr_len);
 	*addr_len = m->bind_addr_len;
+
+	return (0);
+}
+
+
+int
+allium_ptcfg_auth_cookie_file(const allium_ptcfg *cfg, char *path, size_t
+    *path_len)
+{
+	size_t len;
+
+	if ((NULL == cfg) || (NULL == path_len))
+		return (ALLIUM_ERR_INVAL);
+
+	if (!cfg->is_server)
+		return (ALLIUM_ERR_PTCFG_NOT_SERVER);
+
+	if (NULL == cfg->auth_cookie_file)
+		return (ALLIUM_ERR_PTCFG_NO_AUTH_COOKIE);
+
+	len = blength(cfg->auth_cookie_file) + 1;
+	if ((NULL == path) || (*path_len < len)) {
+		*path_len = len;
+		return (ALLIUM_ERR_NOBUFS);
+	}
+	memcpy(path, cfg->auth_cookie_file->data, len);
+	path[len - 1] = '\0';
+	*path_len = len;
 
 	return (0);
 }
