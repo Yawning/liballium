@@ -1,0 +1,42 @@
+liballium: A C Tor Pluggable Transports Utility Library
+Yawning Angel <yawning at schwanenlied dot me>
+
+liballium attempts to reduce the amount of boilerplate code required to
+implement pluggable transports for Tor in C or C++.
+
+Features:
+ * Handles the runtime configuration of PT clients and servers
+ * (TODO) Routines for talking to the transport control port
+ * (TODO) Routines for talking to the extended OR port (including a traffic shaper)
+ * (TODO) Routines for implementing a SOCKSv4/5 proxy server
+ * (TODO) Various helper routines
+
+liballium embeds the following third party codebases:
+ * Better String Library (safer string manipulation routines)
+ * sput (unit test framework, included in tests only)
+
+Specs implemented:
+ * https://gitweb.torproject.org/torspec.git/blob/HEAD:/proposals/
+   180-pluggable-transport.txt
+ * (TODO) https://gitweb.torproject.org/torspec.git/blob/HEAD:/proposals/
+   196-transport-control-ports.txt
+
+Notes:
+ * Basic familiarity with the relevant Tor specs is assumed.
+ * (TODO) Like 99% of the other SOCKSv5 implementations in the wild, liballium
+   does not and will not support GSSAPI authentication.
+ * The code should work on Windows, however it is untested on that platform
+   and most likely requires changes.  Patches accepted.
+ * The Tor Pluggable Transport spec does not currently specify the format for
+   IPv6 addresses.  liballium assumes that the standard [addr]:port form is to
+   be used.
+
+Known gotchas:
+ * allium_ptcfg_state_dir() will probably misbehave if the PT state directory
+   path name is non-ASCII.  This behavior is not considered a bug as enviornment
+   variable values are NULL terminated by definiton (See IEEE Std. 1003.1 8.1).
+ * tests/ptcfg_test.c depends on inet_pton so it won't run on ancient systems.
+   A notable one would be WinXP.  This probably won't be fixed.
+
+See the COPYING file for licence related information.
+
