@@ -248,7 +248,7 @@ ptclient_init(allium_ptcfg *cfg)
 	/*
 	 * Inform Tor about the SOCKS version we support, the address that we
 	 * are accepting SOCKS connections on, and what arguments mandetory
-	 * or optional) that should be passed via the SOCKS auth sidechannel
+	 * or optional that should be passed via the SOCKS auth sidechannel
 	 * on a per-connection basis.
 	 */
 
