@@ -29,6 +29,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <assert.h>
+
 #include "allium.h"
 #include "bstrlib.h"
 
@@ -43,6 +45,7 @@
 #define PTCFG_SERVER_BIND_ADDR		"TOR_PT_SERVER_BINDADDR"
 #define PTCFG_SERVER_TRANSPORTS		"TOR_PT_SERVER_TRANSPORTS"
 #define PTCFG_AUTH_COOKIE_FILE		"TOR_PT_AUTH_COOKIE_FILE"
+#define PTCFG_SERVER_TRANSPORT_OPTIONS	"TOR_PT_SERVER_TRANSPORT_OPTIONS"
 
 #define PTCFG_MANAGED_TRANSPORT_V1	"1"
 #define PTCFG_ALL_TRANSPORTS		"*"
@@ -74,6 +77,15 @@ struct allium_ptcfg_s {
 };
 
 
+static int parse_protocol_version(allium_ptcfg *cfg, const char *version);
+static int parse_state_directory(allium_ptcfg *cfg, const char *path);
+static int parse_transports(allium_ptcfg *cfg, const char *transports);
+static int parse_or_port(allium_ptcfg *cfg, const char *or_port);
+static int parse_ext_port(allium_ptcfg *cfg, const char *ext_port);
+static int parse_bind_address(allium_ptcfg *cfg, const char *addrs);
+static int parse_auth_cookie(allium_ptcfg *cfg, const char *path);
+static int parse_server_xport_options(allium_ptcfg *cfg, const char *options);
+
 static struct allium_ptcfg_method_s *get_method(const allium_ptcfg *cfg, const
     char *method);
 static int parse_addr(const char *addr, struct sockaddr *out, socklen_t
@@ -84,10 +96,7 @@ allium_ptcfg *
 allium_ptcfg_init(void)
 {
 	allium_ptcfg *cfg;
-	int transports_valid = 0;
-	int orport_valid = 0;
-	int extport_valid = 0;
-	int bindaddrs_valid = 0;
+	int rval;
 
 	cfg = calloc(1, sizeof(*cfg));
 	if (NULL == cfg) {
@@ -95,113 +104,23 @@ allium_ptcfg_init(void)
 		return (NULL);
 	}
 
-	/*
-	 * Ensure that we are speaking a compatible version before contiuning
-	 * parsing.
-	 */
-	do {
-		const struct tagbstring supported_ver = bsStatic(PTCFG_MANAGED_TRANSPORT_V1);
-		struct bstrList *l;
-		bstring str;
-		int i;
-
-		str = bfromcstr(getenv(PTCFG_MANAGED_TRANSPORT_VER));
-		if (NULL == str) {
-			fprintf(stdout, "ENV-ERROR No Managed Transport Version\n");
-			break;
-		}
-		if (0 == blength(str)) {
-			bdestroy(str);
-			fprintf(stdout, "ENV-ERROR Empty Transport Version\n");
-			break;
-		}
-		l = bsplit(str, ',');
-		if (NULL == l) {
-			bdestroy(str);
-			fprintf(stdout, "ENV-ERROR OOM parsing Version\n");
-			break;
-		}
-		for (i = 0; i < l->qty; i++) {
-			if (0 == bstrcmp(l->entry[i], &supported_ver)) {
-				cfg->version = bstrcpy(l->entry[i]);
-				break;
-			}
-		}
-		bstrListDestroy(l);
-		bdestroy(str);
-		if (NULL == cfg->version)
-			fprintf(stdout, "VERSION-ERROR no-version\n");
-	} while (0);
-	if (NULL == cfg->version) {
+	/* Parse the protocol version and validate it */
+	rval = parse_protocol_version(cfg, getenv(PTCFG_MANAGED_TRANSPORT_VER));
+	if (rval) {
 		allium_ptcfg_free(cfg);
 		return (NULL);
 	}
 
-	/* Handle the state directory */
-	cfg->state_location = bfromcstr(getenv(PTCFG_STATE_LOCATION));
-	if (NULL == cfg->state_location) {
-		/* Note: This can also be a case where we are OOM */
-		fprintf(stdout, "ENV-ERROR No State Directory\n");
+	/* State directory */
+	rval = parse_state_directory(cfg, getenv(PTCFG_STATE_LOCATION));
+	if (rval) {
 		allium_ptcfg_free(cfg);
 		return (NULL);
 	}
 
-	/* Handle the transport list */
-	do {
-		struct bstrList *l;
-		bstring str;
-		char *transports;
-		int i;
-
-		transports = getenv(PTCFG_SERVER_TRANSPORTS);
-		cfg->is_server = (NULL != transports);
-		if (!cfg->is_server)
-			transports = getenv(PTCFG_CLIENT_TRANSPORTS);
-		if (NULL == transports) {
-			fprintf(stdout, "ENV-ERROR No Transports\n");
-			break;
-		}
-		str = bfromcstr(transports);
-		if (NULL == str) {
-			fprintf(stdout, "ENV-ERROR OOM parsing Transports\n");
-			break;
-		}
-		if (0 == blength(str)) {
-			bdestroy(str);
-			fprintf(stdout, "ENV-ERROR Empty Transport List\n");
-			break;
-		}
-		l = bsplit(str, ',');
-		if (NULL == l) {
-			bdestroy(str);
-			fprintf(stdout, "ENV-ERROR OOM parsing Transports\n");
-			break;
-		}
-		cfg->methods = calloc(l->qty, sizeof(*cfg->methods));
-		if (NULL == cfg->methods) {
-			bstrListDestroy(l);
-			bdestroy(str);
-			fprintf(stdout, "ENV-ERROR OOM parsing Transports\n");
-			break;
-		}
-		for (i = 0; i < l->qty; i++) {
-			if (0 == blength(l->entry[i])) {
-				fprintf(stdout, "ENV-ERROR Invalid Transport\n");
-				goto done_transport_iter;
-			}
-			cfg->methods[i].name = bstrcpy(l->entry[i]);
-			if (NULL == cfg->methods[i].name) {
-				fprintf(stdout, "ENV-ERROR OOM parsing Transports\n");
-				goto done_transport_iter;
-			}
-			cfg->nr_methods++;
-		}
-		transports_valid = 1;
-done_transport_iter:
-		bstrListDestroy(l);
-		bdestroy(str);
-	} while (0);
-	if (!transports_valid) {
+	/* Transport list */
+	rval = parse_transports(cfg, getenv(PTCFG_SERVER_TRANSPORTS));
+	if (rval) {
 		allium_ptcfg_free(cfg);
 		return (NULL);
 	}
@@ -209,133 +128,44 @@ done_transport_iter:
 	if (!cfg->is_server)
 		goto done;
 
-
 	/*
 	 * Handle the server specific options
 	 */
 
 	/* ORPort */
-	do {
-		char *or_port;
-
-		or_port = getenv(PTCFG_ORPORT);
-		if (NULL == or_port) {
-			fprintf(stdout, "ENV-ERROR No ORPort\n");
-			break;
-		}
-		cfg->or_port_len = sizeof(cfg->or_port);
-		if (parse_addr(or_port, (struct sockaddr *)&cfg->or_port,
-			    &cfg->or_port_len)) {
-			fprintf(stdout, "ENV-ERROR Malformed ORPort\n");
-			break;
-		}
-		orport_valid = 1;
-	} while (0);
-	if (!orport_valid) {
+	rval = parse_or_port(cfg, getenv(PTCFG_ORPORT));
+	if (rval) {
 		allium_ptcfg_free(cfg);
 		return (NULL);
 	}
 
 	/* Extended Server Port */
-	do {
-		char *ext_port;
-
-		ext_port = getenv(PTCFG_EXTENDED_SERVER_PORT);
-#if 0
-
-		/*
-		 * The spec says that this will always exist, but according to
-		 * src/or/transports.c, the intention moving forward is for it
-		 * to be optional, so be tollerant.
-		 */
-		if (NULL == ext_port) {
-			fprintf(stdout, "ENV-ERROR No Extended Server Port\n");
-			break;
-		}
-#else
-		if ((NULL == ext_port) || (0 == strlen(ext_port))) {
-			extport_valid = 1;
-			break;
-		}
-#endif
-		cfg->ext_port_len = sizeof(cfg->ext_port);
-		if (parse_addr(ext_port, (struct sockaddr *)&cfg->ext_port,
-			    &cfg->ext_port_len)) {
-			fprintf(stdout, "ENV-ERROR Malformed Extended Server Port\n");
-			break;
-		}
-		cfg->has_ext_port = 1;
-		extport_valid = 1;
-	} while (0);
-	if (!extport_valid) {
+	rval = parse_ext_port(cfg, getenv(PTCFG_EXTENDED_SERVER_PORT));
+	if (rval) {
 		allium_ptcfg_free(cfg);
 		return (NULL);
 	}
 
 	/* Bind addresses */
-	do {
-		struct bstrList *l;
-		bstring str;
-		int i, j;
-
-		str = bfromcstr(getenv(PTCFG_SERVER_BIND_ADDR));
-		if (NULL == str) {
-			/* Note: This can also be a case where we are OOM */
-			fprintf(stdout, "ENV-ERROR No Bind Addresses\n");
-			break;
-		}
-		l = bsplit(str, ',');
-		if (NULL == l) {
-			bdestroy(str);
-			fprintf(stdout, "ENV-ERROR OOM parsing Bind Addresses\n");
-			break;
-		}
-		if (l->qty != cfg->nr_methods) {
-			fprintf(stdout, "ENV-ERROR Malformed Bind Addresses\n");
-			goto done_bindaddrs_iter;
-		}
-		for (i = 0; i < l->qty; i++) {
-			j = bstrrchr(l->entry[i], '-');
-			if ((j != blength(cfg->methods[i].name)) ||
-			    bstrncmp(l->entry[i],
-				    cfg->methods[i].name, j - 1)) {
-				fprintf(stdout, "ENV-ERROR Unexpected method in Bind Address\n");
-				goto done_bindaddrs_iter;
-			}
-			cfg->methods[i].bind_addr_len = sizeof(cfg->methods[i].bind_addr);
-			if (parse_addr(bdataofs(l->entry[i], j + 1),
-				    (struct sockaddr *)&cfg->methods[i].bind_addr,
-				    &cfg->methods[i].bind_addr_len)) {
-				fprintf(stdout, "ENV-ERROR Invalid address in Bind Address (%s)\n",
-				    bdata(l->entry[i]));
-				goto done_bindaddrs_iter;
-			}
-			cfg->methods[i].has_bind_addr = 1;
-		}
-		bindaddrs_valid = 1;
-done_bindaddrs_iter:
-		bstrListDestroy(l);
-		bdestroy(str);
-	} while (0);
-	if (!bindaddrs_valid) {
+	rval = parse_bind_address(cfg, getenv(PTCFG_SERVER_BIND_ADDR));
+	if (rval) {
 		allium_ptcfg_free(cfg);
 		return (NULL);
 	}
 
-	/* Handle the ext port auth cookie */
-	do {
-		char *cookie_file = getenv(PTCFG_AUTH_COOKIE_FILE);
+	/* Ext port auth cookie */
+	rval = parse_auth_cookie(cfg, getenv(PTCFG_AUTH_COOKIE_FILE));
+	if (rval) {
+		allium_ptcfg_free(cfg);
+		return (NULL);
+	}
 
-		if (NULL == cookie_file)
-			break;
-
-		cfg->auth_cookie_file = bfromcstr(cookie_file);
-		if (NULL == cfg->auth_cookie_file) {
-			fprintf(stdout, "ENV-ERROR OOM parsing Auth Cookie File\n");
-			allium_ptcfg_free(cfg);
-			return (NULL);
-		}
-	} while (0);
+	/* Server transport options */
+	rval = parse_server_xport_options(cfg, getenv(PTCFG_SERVER_TRANSPORT_OPTIONS));
+	if (rval) {
+		allium_ptcfg_free(cfg);
+		return (NULL);
+	}
 
 done:
 	/* Report back that a compatible PT version has been found */
@@ -626,14 +456,279 @@ allium_ptcfg_methods_done(const allium_ptcfg *cfg)
 }
 
 
+static int
+parse_protocol_version(allium_ptcfg *cfg, const char *version)
+{
+	const struct tagbstring supported_ver = bsStatic(PTCFG_MANAGED_TRANSPORT_V1);
+	struct bstrList *l;
+	bstring str;
+	int i;
+
+	assert(NULL != cfg);
+
+	str = bfromcstr(version);
+	if (NULL == str) {
+		fprintf(stdout, "ENV-ERROR No Managed Transport Version\n");
+		return (-1);
+	}
+	if (0 == blength(str)) {
+		bdestroy(str);
+		fprintf(stdout, "ENV-ERROR Empty Transport Version\n");
+		return (-1);
+	}
+	l = bsplit(str, ',');
+	if (NULL == l) {
+		bdestroy(str);
+		fprintf(stdout, "ENV-ERROR OOM parsing Version\n");
+		return (-1);
+	}
+	for (i = 0; i < l->qty; i++) {
+		if (0 == bstrcmp(l->entry[i], &supported_ver)) {
+			cfg->version = bstrcpy(l->entry[i]);
+			break;
+		}
+	}
+	bstrListDestroy(l);
+	bdestroy(str);
+	if (NULL == cfg->version) {
+		fprintf(stdout, "VERSION-ERROR no-version\n");
+		return (-1);
+	}
+
+	return (0);
+}
+
+
+static int
+parse_state_directory(allium_ptcfg *cfg, const char *path)
+{
+	assert(NULL != cfg);
+
+	if (NULL == path) {
+		fprintf(stdout, "ENV-ERROR No State Directory\n");
+		return (-1);
+	}
+
+	cfg->state_location = bfromcstr(getenv(PTCFG_STATE_LOCATION));
+	if (NULL == cfg->state_location) {
+		/* Note: This can also be a case where we are OOM */
+		fprintf(stdout, "ENV-ERROR OOM parsing State Location\n");
+		return (-1);
+	}
+
+	return (0);
+}
+
+
+static int
+parse_transports(allium_ptcfg *cfg, const char *transports)
+{
+	struct bstrList *l;
+	bstring str;
+	int i;
+
+	assert(NULL != cfg);
+
+	cfg->is_server = (NULL != transports);
+	if (!cfg->is_server)
+		transports = getenv(PTCFG_CLIENT_TRANSPORTS);
+	if (NULL == transports) {
+		fprintf(stdout, "ENV-ERROR No Transports\n");
+		return (-1);
+	}
+	str = bfromcstr(transports);
+	if (NULL == str) {
+		fprintf(stdout, "ENV-ERROR OOM parsing Transports\n");
+		return (-1);
+	}
+	if (0 == blength(str)) {
+		bdestroy(str);
+		fprintf(stdout, "ENV-ERROR Empty Transport List\n");
+		return (-1);
+	}
+	l = bsplit(str, ',');
+	if (NULL == l) {
+		bdestroy(str);
+		fprintf(stdout, "ENV-ERROR OOM parsing Transports\n");
+		return (-1);
+	}
+	cfg->methods = calloc(l->qty, sizeof(*cfg->methods));
+	if (NULL == cfg->methods) {
+		bstrListDestroy(l);
+		bdestroy(str);
+		fprintf(stdout, "ENV-ERROR OOM parsing Transports\n");
+		return (-1);
+	}
+	for (i = 0; i < l->qty; i++) {
+		if (0 == blength(l->entry[i])) {
+			fprintf(stdout, "ENV-ERROR Invalid Transport\n");
+			bstrListDestroy(l);
+			bdestroy(str);
+			return (-1);
+		}
+		cfg->methods[i].name = bstrcpy(l->entry[i]);
+		if (NULL == cfg->methods[i].name) {
+			fprintf(stdout, "ENV-ERROR OOM parsing Transports\n");
+			bstrListDestroy(l);
+			bdestroy(str);
+			return (-1);
+		}
+		cfg->nr_methods++;
+	}
+
+	return (0);
+}
+
+
+static int
+parse_or_port(allium_ptcfg *cfg, const char *or_port)
+{
+	assert(NULL != cfg);
+
+	if (NULL == or_port) {
+		fprintf(stdout, "ENV-ERROR No ORPort\n");
+		return (-1);
+	}
+	cfg->or_port_len = sizeof(cfg->or_port);
+	if (parse_addr(or_port, (struct sockaddr *)&cfg->or_port,
+		    &cfg->or_port_len)) {
+		fprintf(stdout, "ENV-ERROR Malformed ORPort\n");
+		return (-1);
+	}
+
+	return (0);
+}
+
+
+static int
+parse_ext_port(allium_ptcfg *cfg, const char *ext_port)
+{
+	assert(NULL != cfg);
+
+#if 0
+
+	/*
+	 * The spec says that this will always exist, but according to
+	 * src/or/transports.c, the intention moving forward is for it to be optional,
+	 * so be tollerant.
+	 */
+	if (NULL == ext_port) {
+		fprintf(stdout, "ENV-ERROR No Extended Server Port\n");
+		return (-1);
+	}
+#else
+	if ((NULL == ext_port) || (0 == strlen(ext_port))) {
+		return (0);
+	}
+#endif
+	cfg->ext_port_len = sizeof(cfg->ext_port);
+	if (parse_addr(ext_port, (struct sockaddr *)&cfg->ext_port,
+		    &cfg->ext_port_len)) {
+		fprintf(stdout, "ENV-ERROR Malformed Extended Server Port\n");
+		return (-1);
+	}
+	cfg->has_ext_port = 1;
+
+	return (0);
+}
+
+
+static int
+parse_bind_address(allium_ptcfg *cfg, const char *addrs)
+{
+	struct bstrList *l;
+	bstring str;
+	int i, j;
+
+	assert(NULL != cfg);
+
+	if (NULL == addrs) {
+		fprintf(stdout, "ENV-ERROR No Bind Addresses\n");
+		return (-1);
+	}
+	str = bfromcstr(addrs);
+	if (NULL == str) {
+		fprintf(stdout, "ENV-ERROR OOM parsing Bind Addresses\n");
+		return (-1);
+	}
+	l = bsplit(str, ',');
+	if (NULL == l) {
+		bdestroy(str);
+		fprintf(stdout, "ENV-ERROR OOM parsing Bind Addresses\n");
+		return (-1);
+	}
+	if (l->qty != cfg->nr_methods) {
+		fprintf(stdout, "ENV-ERROR Malformed Bind Addresses\n");
+		bstrListDestroy(l);
+		bdestroy(str);
+		return (-1);
+	}
+	for (i = 0; i < l->qty; i++) {
+		j = bstrrchr(l->entry[i], '-');
+		if ((j != blength(cfg->methods[i].name)) || bstrncmp(l->entry[i],
+			    cfg->methods[i].name, j - 1)) {
+			fprintf(stdout, "ENV-ERROR Unexpected method in Bind Address\n");
+			bstrListDestroy(l);
+			bdestroy(str);
+			return (-1);
+		}
+		cfg->methods[i].bind_addr_len = sizeof(cfg->methods[i].bind_addr);
+		if (parse_addr(bdataofs(l->entry[i], j + 1),
+			    (struct sockaddr *)&cfg->methods[i].bind_addr,
+			    &cfg->methods[i].bind_addr_len)) {
+			fprintf(stdout, "ENV-ERROR Invalid address in Bind Address (%s)\n",
+			    bdata(l->entry[i]));
+			bstrListDestroy(l);
+			bdestroy(str);
+			return (-1);
+		}
+		cfg->methods[i].has_bind_addr = 1;
+	}
+	bstrListDestroy(l);
+	bdestroy(str);
+
+	return (0);
+}
+
+
+static int
+parse_auth_cookie(allium_ptcfg *cfg, const char *path)
+{
+	assert(NULL != cfg);
+
+	if (NULL == path)
+		return (0);
+
+	cfg->auth_cookie_file = bfromcstr(path);
+	if (NULL == cfg->auth_cookie_file) {
+		fprintf(stdout, "ENV-ERROR OOM parsing Auth Cookie File\n");
+		return (-1);
+	}
+
+	return (0);
+}
+
+
+static int
+parse_server_xport_options(allium_ptcfg *cfg, const char *options)
+{
+	assert(NULL != cfg);
+
+	/* TODO: Implement support for this */
+
+	return (0);
+}
+
+
 static struct allium_ptcfg_method_s *
 get_method(const allium_ptcfg *cfg, const char *method)
 {
 	struct tagbstring all_trans = bsStatic(PTCFG_ALL_TRANSPORTS);
 	int i;
 
-	if ((NULL == cfg) || (NULL == method))
-		return (NULL);
+	/* All the routines that call this check these */
+	assert(NULL != cfg);
+	assert(NULL != method);
 
 	for (i = 0; i < cfg->nr_methods; i++) {
 		if (!cfg->is_server &&
