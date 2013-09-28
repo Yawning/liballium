@@ -663,6 +663,12 @@ parse_bind_address(allium_ptcfg *cfg, const char *addrs)
 		return (-1);
 	}
 	for (i = 0; i < l->qty; i++) {
+		/*
+		 * Per pt-spec.txt, the order is identical to the transport
+		 * list.  I have no idea what is supposed to happen when
+		 * the transport list is wildcarded, so this routine will
+		 * currently fail gracefully.
+		 */
 		j = bstrrchr(l->entry[i], '-');
 		if ((j != blength(cfg->methods[i].name)) || bstrncmp(l->entry[i],
 			    cfg->methods[i].name, j - 1)) {
