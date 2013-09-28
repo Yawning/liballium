@@ -188,12 +188,9 @@ allium_ptcfg_init(void)
 			if (0 == blength(l->entry[i])) {
 				fprintf(stdout, "ENV-ERROR Invalid Transport\n");
 				goto done_transport_iter;
-				break;
 			}
 			cfg->methods[i].name = bstrcpy(l->entry[i]);
 			if (NULL == cfg->methods[i].name) {
-				bstrListDestroy(l);
-				bdestroy(str);
 				fprintf(stdout, "ENV-ERROR OOM parsing Transports\n");
 				goto done_transport_iter;
 			}
