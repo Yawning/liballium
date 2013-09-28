@@ -509,9 +509,8 @@ parse_state_directory(allium_ptcfg *cfg, const char *path)
 		return (-1);
 	}
 
-	cfg->state_location = bfromcstr(getenv(PTCFG_STATE_LOCATION));
+	cfg->state_location = bfromcstr(path);
 	if (NULL == cfg->state_location) {
-		/* Note: This can also be a case where we are OOM */
 		fprintf(stdout, "ENV-ERROR OOM parsing State Location\n");
 		return (-1);
 	}
