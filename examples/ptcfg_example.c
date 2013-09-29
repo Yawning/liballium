@@ -42,6 +42,7 @@
 #define METHOD_NAME		"trebuchet"
 #define METHOD_ARGS		"rocks,height"
 #define METHOD_OPT_ARGS		"tensile-strength"
+#define METHOD_SERVER_OPT	"rocks"
 
 
 static int ptserver_init(allium_ptcfg *cfg);
@@ -125,7 +126,9 @@ ptserver_init(allium_ptcfg *cfg)
 {
 	/* Server related config options */
 	char auth_cookie[1024];
+	char rocks[16];
 	size_t cookie_len;
+	size_t rocks_len;
 	struct sockaddr_in orport;
 	struct sockaddr_in extport;
 	struct sockaddr_storage bindaddr;
@@ -164,7 +167,7 @@ ptserver_init(allium_ptcfg *cfg)
 		/*
 		 * Might as well show off the other way to get strings out of
 		 * the ptcfg module (You can use the same pattern with the
-		 * state_dir.
+		 * state_dir.)
 		 */
 		cookie_len = sizeof(auth_cookie);
 		rval = allium_ptcfg_auth_cookie_file(cfg, auth_cookie,
@@ -193,6 +196,20 @@ ptserver_init(allium_ptcfg *cfg)
 		/* Something went horribly wrong */
 		allium_ptcfg_method_error(cfg, METHOD_NAME, "Failed to query BindAddr");
 		return (-1);
+	}
+
+	/* Query the Server Transport Options if you have any */
+	rocks_len = sizeof(rocks);
+	rval = allium_ptcfg_server_xport_option(cfg, METHOD_NAME,
+			METHOD_SERVER_OPT, rocks, &rocks_len);
+	if (ALLIUM_ERR_PTCFG_NO_XPORT_OPTION == rval) {
+		/* Option not set */
+	} else if (rval) {
+		/* rval is 99% ALLIUM_ERR_NOBUFS, but too lazy */
+		allium_ptcfg_method_error(cfg, METHOD_NAME, "Failed to query transport option");
+		return (-1);
+	} else {
+		/* Parse the option */
 	}
 
 	/*
