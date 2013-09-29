@@ -1,5 +1,5 @@
 /*
- * liballium.h: liballium public interface
+ * allium_util.c: Various utillity functions.
  * Copyright 2013 Yawning Angel <yawning at schwanenlied dot me>
  * All rights reserved.
  *
@@ -25,23 +25,18 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "allium_ptcfg.h"
+#include <stdlib.h>
 
-#ifndef _ALLIUM_H_
-#define _ALLIUM_H_
+#include "allium.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
-#define ALLIUM_ERR		0x00010000
-#define ALLIUM_ERR_INVAL	(-(ALLIUM_ERR | 1))
-#define ALLIUM_ERR_NOBUFS	(-(ALLIUM_ERR | 2))
+void *
+allium_scrub(void *s, size_t n)
+{
+	volatile unsigned char *p = s;
 
-void *allium_scrub(void *s, size_t n);
+	while (n--)
+		*p = '\0';
 
-#ifdef __cplusplus
+	return s;
 }
-#endif
-
-#endif

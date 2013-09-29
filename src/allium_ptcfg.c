@@ -1,5 +1,5 @@
 /*
- * liballium_ptcfg.c: Tor Pluggable Transport Configuration
+ * allium_ptcfg.c: Tor Pluggable Transport Configuration
  * Copyright 2013 Yawning Angel <yawning at schwanenlied dot me>
  * All rights reserved.
  *
@@ -50,13 +50,19 @@
 #define PTCFG_MANAGED_TRANSPORT_V1	"1"
 #define PTCFG_ALL_TRANSPORTS		"*"
 
+struct allium_ptcfg_xport_opt_s {
+	bstring					key;
+	bstring					value;
+	struct allium_ptcfg_xport_opt_s *	next;
+};
 
 struct allium_ptcfg_method_s {
-	bstring			name;
+	bstring					name;
 
-	int			has_bind_addr;
-	struct sockaddr_storage bind_addr;
-	socklen_t		bind_addr_len;
+	int					has_bind_addr;
+	struct sockaddr_storage			bind_addr;
+	socklen_t				bind_addr_len;
+	struct allium_ptcfg_xport_opt_s *	xport_opts;
 };
 
 struct allium_ptcfg_s {
@@ -85,11 +91,15 @@ static int parse_ext_port(allium_ptcfg *cfg, const char *ext_port);
 static int parse_bind_address(allium_ptcfg *cfg, const char *addrs);
 static int parse_auth_cookie(allium_ptcfg *cfg, const char *path);
 static int parse_server_xport_options(allium_ptcfg *cfg, const char *options);
+static int parse_server_xport_option(allium_ptcfg *cfg, const bstring arg_str);
 
 static struct allium_ptcfg_method_s *get_method(const allium_ptcfg *cfg, const
     char *method);
+static struct allium_ptcfg_xport_opt_s *get_xport_opt(struct
+    allium_ptcfg_method_s *method, const bstring key);
 static int parse_addr(const char *addr, struct sockaddr *out, socklen_t
     *out_len);
+static int bdestroy_safe(bstring str);
 
 
 allium_ptcfg *
@@ -178,6 +188,7 @@ done:
 void
 allium_ptcfg_free(allium_ptcfg *cfg)
 {
+	struct allium_ptcfg_xport_opt_s *opt, *tmp;
 	int i;
 
 	if (NULL == cfg)
@@ -189,10 +200,16 @@ allium_ptcfg_free(allium_ptcfg *cfg)
 	if (NULL != cfg->methods) {
 		for (i = 0; i < cfg->nr_methods; i++) {
 			bdestroy(cfg->methods[i].name);
+			opt = cfg->methods[i].xport_opts;
+			while (NULL != opt) {
+				tmp = opt->next;
+				bdestroy(opt->key);
+				bdestroy_safe(opt->value);
+				opt = tmp;
+			}
 		}
 		free(cfg->methods);
 	}
-
 	free(cfg);
 }
 
@@ -328,6 +345,44 @@ allium_ptcfg_auth_cookie_file(const allium_ptcfg *cfg, char *path, size_t
 	memcpy(path, cfg->auth_cookie_file->data, len);
 	path[len - 1] = '\0';
 	*path_len = len;
+
+	return (0);
+}
+
+
+int
+allium_ptcfg_server_xport_option(const allium_ptcfg *cfg, const char *method,
+    const char *key, char *value, size_t *value_len)
+{
+	struct allium_ptcfg_method_s *m;
+	struct allium_ptcfg_xport_opt_s *opt;
+	struct tagbstring key_str;
+	size_t len;
+
+	if ((NULL == cfg) || (NULL == method) || (NULL == key) || (NULL ==
+		    value_len))
+		return (ALLIUM_ERR_INVAL);
+
+	if (!cfg->is_server)
+		return (ALLIUM_ERR_PTCFG_NOT_SERVER);
+
+	m = get_method(cfg, method);
+	if (NULL == m)
+		return (ALLIUM_ERR_PTCFG_INVALID_METHOD);
+
+	btfromcstr(key_str, key);
+	opt = get_xport_opt(m, &key_str);
+	if ((NULL == opt) || (0 == blength(opt->value)))
+		return (ALLIUM_ERR_PTCFG_NO_XPORT_OPTION);
+
+	len = blength(opt->value) + 1;
+	if ((NULL == value) || (*value_len < len)) {
+		*value_len = len;
+		return (ALLIUM_ERR_NOBUFS);
+	}
+	memcpy(value, opt->value->data, len);
+	value[len - 1] = '\0';
+	*value_len = len;
 
 	return (0);
 }
@@ -608,8 +663,8 @@ parse_ext_port(allium_ptcfg *cfg, const char *ext_port)
 
 	/*
 	 * The spec says that this will always exist, but according to
-	 * src/or/transports.c, the intention moving forward is for it to be optional,
-	 * so be tollerant.
+	 * src/or/transports.c, the intention moving forward is for it to be
+	 * optional, so be tollerant.
 	 */
 	if (NULL == ext_port) {
 		fprintf(stdout, "ENV-ERROR No Extended Server Port\n");
@@ -717,9 +772,146 @@ parse_auth_cookie(allium_ptcfg *cfg, const char *path)
 static int
 parse_server_xport_options(allium_ptcfg *cfg, const char *options)
 {
+	struct bstrList *l;
+	bstring str;
+	int i;
+
 	assert(NULL != cfg);
 
-	/* TODO: Implement support for this */
+	if ((NULL == options) || (0 == strlen(options)))
+		return (0);
+
+	str = bfromcstr(options);
+	if (NULL == str) {
+		fprintf(stdout, "ENV-ERROR OOM parsing Transport Options\n");
+		return (-1);
+	}
+	l = bsplit(str, ';');
+	if (NULL == l) {
+		bdestroy_safe(str);
+		fprintf(stdout, "ENV-ERROR OOM parsing Transport Options\n");
+		return (-1);
+	}
+	for (i = 0; i < l->qty; /* See next_i */) {
+		bstring arg_str;
+		int next_i = i + 1;
+
+		if (0 == blength(l->entry[i])) {
+out_malformed:
+			fprintf(stdout, "ENV-ERROR Malformed Transport Option\n");
+			bstrListDestroy(l);
+			bdestroy_safe(str);
+			return (-1);
+		}
+		arg_str = bstrcpy(l->entry[i]);
+		if (NULL == arg_str) {
+out_oom:
+			bstrListDestroy(l);
+			bdestroy_safe(str);
+			fprintf(stdout, "ENV-ERROR OOM parsing Transport Options\n");
+			return (-1);
+		}
+		while ('\\' == bchar(arg_str, blength(arg_str) - 1) && next_i < l->qty) {
+			*bdataofs(arg_str, blength(arg_str) - 1) = ';';
+			if (NULL == l->entry[next_i]) {
+				next_i++;
+				break;
+			}
+			if (BSTR_ERR == bconcat(arg_str, l->entry[next_i])) {
+				bdestroy_safe(arg_str);
+				goto out_oom;
+			}
+			next_i++;
+		}
+		if (parse_server_xport_option(cfg, arg_str)) {
+			/*
+			 * XXX: This also will claim that the option is
+			 * malformed if a malloc fails in the subroutine.
+			 * However if that happens, you have bigger problems.
+			 */
+			bdestroy_safe(arg_str);
+			goto out_malformed;
+		}
+		i = next_i;
+		bdestroy(arg_str);
+	}
+	bstrListDestroy(l);
+	bdestroy_safe(str);
+
+	return (0);
+}
+
+
+static int
+parse_server_xport_option(allium_ptcfg *cfg, const bstring arg_str)
+{
+	struct allium_ptcfg_method_s *m;
+	struct allium_ptcfg_xport_opt_s *opt;
+	bstring transport;
+	bstring key;
+	bstring value;
+	int i, j;
+
+	assert(cfg);
+	assert(arg_str);
+
+	if (0 == blength(arg_str))
+		return (-1);
+
+	/*
+	 * Figure out what transport this argument is for.  We don't need to
+	 * unescape method names as they conform to "[a-zA-Z_][a-zA-Z0-9_]*"
+	 */
+	i = bstrchr(arg_str, ':');
+	if (BSTR_ERR == i)
+		return (-1);
+	transport = bmidstr(arg_str, 0, i);
+	if (NULL == transport)
+		return (-1);
+	m = get_method(cfg, bdata(transport));
+	bdestroy(transport);	/* Done with the transport at this point */
+	if (NULL == m)
+		return (-1);
+
+	/*
+	 * Figure out what key the transport is expecting the value for.
+	 *
+	 * XXX: If people want to use the escaped characters in their keys they
+	 * get what they deserve (Note this as a gotcha and fix it when people
+	 * cry about it).
+	 */
+	j = bstrchrp(arg_str, '=', i);
+	if (BSTR_ERR == j)
+		return (-1);
+	key = bmidstr(arg_str, i + 1, j - i - 1);
+	if (NULL == key)
+		return (-1);
+	opt = get_xport_opt(m, key);
+	if ((NULL != opt) || (0 == blength(key))) {
+		/* We don't support redefining existing key/value pairs */
+		bdestroy(key);
+		return (-1);
+	}
+
+	/* Parse the value, unescaping as needed */
+	value = bmidstr(arg_str, j + 1, blength(arg_str) - j - 1);
+	if (NULL == value) {
+		bdestroy(key);
+		return (-1);
+	}
+	/* XXX: Unescape value: \, \\ \: \; \= */
+
+	/* Stash it away so people can get to it */
+	opt = calloc(1, sizeof(*opt));
+	if (NULL == opt) {
+		bdestroy(key);
+		bdestroy_safe(value);
+		return (-1);
+	}
+	opt->key = key;
+	opt->value = value;
+	opt->next = m->xport_opts;
+	m->xport_opts = opt;
 
 	return (0);
 }
@@ -742,6 +934,25 @@ get_method(const allium_ptcfg *cfg, const char *method)
 
 		if (1 == biseqcstr(cfg->methods[i].name, method))
 			return (&cfg->methods[i]);
+	}
+
+	return (NULL);
+}
+
+
+static struct allium_ptcfg_xport_opt_s *get_xport_opt(struct
+    allium_ptcfg_method_s *method, const bstring key)
+{
+	struct allium_ptcfg_xport_opt_s *opt;
+
+	assert(NULL != method);
+	assert(NULL != key);
+
+	opt = method->xport_opts;
+	while (NULL != opt) {
+		if (1 == biseq(key, opt->key))
+			return (opt);
+		opt = opt->next;
 	}
 
 	return (NULL);
@@ -797,10 +1008,19 @@ parse_addr(const char *addr, struct sockaddr *out, socklen_t *out_len)
 			freeaddrinfo(info);
 		}
 	}
-
 	bdestroy(str);
 	bdestroy(host);
 	bdestroy(service);
 
 	return (ret);
+}
+
+
+static int
+bdestroy_safe(bstring str)
+{
+	if ((NULL != str) && (0 < str->mlen) && (NULL != str->data))
+		allium_scrub(str->data, str->mlen);
+
+	return bdestroy(str);
 }
