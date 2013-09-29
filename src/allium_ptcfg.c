@@ -50,6 +50,15 @@
 #define PTCFG_MANAGED_TRANSPORT_V1	"1"
 #define PTCFG_ALL_TRANSPORTS		"*"
 
+
+/*
+ * blength(s) causes gcc to warn when a tagbstring is passed in, because it
+ * checks that s is valid, and it always is.  Since I only use tagbstrings
+ * that are on the stack, add a dinky macro for the length.
+ */
+#define btlength(s)    (s.slen)
+
+
 struct allium_ptcfg_xport_opt_s {
 	bstring					key;
 	bstring					value;
@@ -100,6 +109,7 @@ static struct allium_ptcfg_xport_opt_s *get_xport_opt(struct
 static int parse_addr(const char *addr, struct sockaddr *out, socklen_t
     *out_len);
 static int bdestroy_safe(bstring str);
+static int bstrListDestroy_safe(struct bstrList *sl);
 
 
 allium_ptcfg *
@@ -515,25 +525,23 @@ static int
 parse_protocol_version(allium_ptcfg *cfg, const char *version)
 {
 	const struct tagbstring supported_ver = bsStatic(PTCFG_MANAGED_TRANSPORT_V1);
+	struct tagbstring str;
 	struct bstrList *l;
-	bstring str;
 	int i;
 
 	assert(NULL != cfg);
 
-	str = bfromcstr(version);
-	if (NULL == str) {
+	if (NULL == version) {
 		fprintf(stdout, "ENV-ERROR No Managed Transport Version\n");
 		return (-1);
 	}
-	if (0 == blength(str)) {
-		bdestroy(str);
+	btfromcstr(str, version);
+	if (0 == btlength(str)) {
 		fprintf(stdout, "ENV-ERROR Empty Transport Version\n");
 		return (-1);
 	}
-	l = bsplit(str, ',');
+	l = bsplit(&str, ',');
 	if (NULL == l) {
-		bdestroy(str);
 		fprintf(stdout, "ENV-ERROR OOM parsing Version\n");
 		return (-1);
 	}
@@ -544,7 +552,6 @@ parse_protocol_version(allium_ptcfg *cfg, const char *version)
 		}
 	}
 	bstrListDestroy(l);
-	bdestroy(str);
 	if (NULL == cfg->version) {
 		fprintf(stdout, "VERSION-ERROR no-version\n");
 		return (-1);
@@ -578,7 +585,7 @@ static int
 parse_transports(allium_ptcfg *cfg, const char *transports)
 {
 	struct bstrList *l;
-	bstring str;
+	struct tagbstring str;
 	int i;
 
 	assert(NULL != cfg);
@@ -590,26 +597,19 @@ parse_transports(allium_ptcfg *cfg, const char *transports)
 		fprintf(stdout, "ENV-ERROR No Transports\n");
 		return (-1);
 	}
-	str = bfromcstr(transports);
-	if (NULL == str) {
-		fprintf(stdout, "ENV-ERROR OOM parsing Transports\n");
-		return (-1);
-	}
-	if (0 == blength(str)) {
-		bdestroy(str);
+	btfromcstr(str, transports);
+	if (0 == btlength(str)) {
 		fprintf(stdout, "ENV-ERROR Empty Transport List\n");
 		return (-1);
 	}
-	l = bsplit(str, ',');
+	l = bsplit(&str, ',');
 	if (NULL == l) {
-		bdestroy(str);
 		fprintf(stdout, "ENV-ERROR OOM parsing Transports\n");
 		return (-1);
 	}
 	cfg->methods = calloc(l->qty, sizeof(*cfg->methods));
 	if (NULL == cfg->methods) {
 		bstrListDestroy(l);
-		bdestroy(str);
 		fprintf(stdout, "ENV-ERROR OOM parsing Transports\n");
 		return (-1);
 	}
@@ -617,14 +617,12 @@ parse_transports(allium_ptcfg *cfg, const char *transports)
 		if (0 == blength(l->entry[i])) {
 			fprintf(stdout, "ENV-ERROR Invalid Transport\n");
 			bstrListDestroy(l);
-			bdestroy(str);
 			return (-1);
 		}
 		cfg->methods[i].name = bstrcpy(l->entry[i]);
 		if (NULL == cfg->methods[i].name) {
 			fprintf(stdout, "ENV-ERROR OOM parsing Transports\n");
 			bstrListDestroy(l);
-			bdestroy(str);
 			return (-1);
 		}
 		cfg->nr_methods++;
@@ -691,7 +689,7 @@ static int
 parse_bind_address(allium_ptcfg *cfg, const char *addrs)
 {
 	struct bstrList *l;
-	bstring str;
+	struct tagbstring str;
 	int i, j;
 
 	assert(NULL != cfg);
@@ -700,21 +698,19 @@ parse_bind_address(allium_ptcfg *cfg, const char *addrs)
 		fprintf(stdout, "ENV-ERROR No Bind Addresses\n");
 		return (-1);
 	}
-	str = bfromcstr(addrs);
-	if (NULL == str) {
-		fprintf(stdout, "ENV-ERROR OOM parsing Bind Addresses\n");
+	btfromcstr(str, addrs);
+	if (0 == btlength(str)) {
+		fprintf(stdout, "ENV-ERROR Empty Bind Address\n");
 		return (-1);
 	}
-	l = bsplit(str, ',');
+	l = bsplit(&str, ',');
 	if (NULL == l) {
-		bdestroy(str);
 		fprintf(stdout, "ENV-ERROR OOM parsing Bind Addresses\n");
 		return (-1);
 	}
 	if (l->qty != cfg->nr_methods) {
 		fprintf(stdout, "ENV-ERROR Malformed Bind Addresses\n");
 		bstrListDestroy(l);
-		bdestroy(str);
 		return (-1);
 	}
 	for (i = 0; i < l->qty; i++) {
@@ -729,7 +725,6 @@ parse_bind_address(allium_ptcfg *cfg, const char *addrs)
 			    cfg->methods[i].name, j - 1)) {
 			fprintf(stdout, "ENV-ERROR Unexpected method in Bind Address\n");
 			bstrListDestroy(l);
-			bdestroy(str);
 			return (-1);
 		}
 		cfg->methods[i].bind_addr_len = sizeof(cfg->methods[i].bind_addr);
@@ -739,13 +734,11 @@ parse_bind_address(allium_ptcfg *cfg, const char *addrs)
 			fprintf(stdout, "ENV-ERROR Invalid address in Bind Address (%s)\n",
 			    bdata(l->entry[i]));
 			bstrListDestroy(l);
-			bdestroy(str);
 			return (-1);
 		}
 		cfg->methods[i].has_bind_addr = 1;
 	}
 	bstrListDestroy(l);
-	bdestroy(str);
 
 	return (0);
 }
@@ -773,7 +766,7 @@ static int
 parse_server_xport_options(allium_ptcfg *cfg, const char *options)
 {
 	struct bstrList *l;
-	bstring str;
+	struct tagbstring str;
 	int i;
 
 	assert(NULL != cfg);
@@ -781,14 +774,9 @@ parse_server_xport_options(allium_ptcfg *cfg, const char *options)
 	if ((NULL == options) || (0 == strlen(options)))
 		return (0);
 
-	str = bfromcstr(options);
-	if (NULL == str) {
-		fprintf(stdout, "ENV-ERROR OOM parsing Transport Options\n");
-		return (-1);
-	}
-	l = bsplit(str, ';');
+	btfromcstr(str, options);
+	l = bsplit(&str, ';');
 	if (NULL == l) {
-		bdestroy_safe(str);
 		fprintf(stdout, "ENV-ERROR OOM parsing Transport Options\n");
 		return (-1);
 	}
@@ -799,15 +787,18 @@ parse_server_xport_options(allium_ptcfg *cfg, const char *options)
 		if (0 == blength(l->entry[i])) {
 out_malformed:
 			fprintf(stdout, "ENV-ERROR Malformed Transport Option\n");
-			bstrListDestroy(l);
-			bdestroy_safe(str);
+			bstrListDestroy_safe(l);
 			return (-1);
 		}
-		arg_str = bstrcpy(l->entry[i]);
+
+		/*
+		 * Allocate arg_str such that realloc will never be called by
+		 * bconcat
+		 */
+		arg_str = bfromcstralloc(btlength(str), bdata(l->entry[i]));
 		if (NULL == arg_str) {
 out_oom:
-			bstrListDestroy(l);
-			bdestroy_safe(str);
+			bstrListDestroy_safe(l);
 			fprintf(stdout, "ENV-ERROR OOM parsing Transport Options\n");
 			return (-1);
 		}
@@ -833,10 +824,9 @@ out_oom:
 			goto out_malformed;
 		}
 		i = next_i;
-		bdestroy(arg_str);
+		bdestroy_safe(arg_str);
 	}
-	bstrListDestroy(l);
-	bdestroy_safe(str);
+	bstrListDestroy_safe(l);
 
 	return (0);
 }
@@ -865,11 +855,13 @@ parse_server_xport_option(allium_ptcfg *cfg, const bstring arg_str)
 	i = bstrchr(arg_str, ':');
 	if (BSTR_ERR == i)
 		return (-1);
+
 	transport = bmidstr(arg_str, 0, i);
 	if (NULL == transport)
 		return (-1);
+
 	m = get_method(cfg, bdata(transport));
-	bdestroy(transport);	/* Done with the transport at this point */
+	bdestroy(transport);    /* Done with the transport at this point */
 	if (NULL == m)
 		return (-1);
 
@@ -883,9 +875,11 @@ parse_server_xport_option(allium_ptcfg *cfg, const bstring arg_str)
 	j = bstrchrp(arg_str, '=', i);
 	if (BSTR_ERR == j)
 		return (-1);
+
 	key = bmidstr(arg_str, i + 1, j - i - 1);
 	if (NULL == key)
 		return (-1);
+
 	opt = get_xport_opt(m, key);
 	if ((NULL != opt) || (0 == blength(key))) {
 		/* We don't support redefining existing key/value pairs */
@@ -1022,5 +1016,18 @@ bdestroy_safe(bstring str)
 	if ((NULL != str) && (0 < str->mlen) && (NULL != str->data))
 		allium_scrub(str->data, str->mlen);
 
-	return bdestroy(str);
+	return (bdestroy(str));
+}
+
+
+static int
+bstrListDestroy_safe(struct bstrList *sl)
+{
+	int i;
+
+	if (NULL != sl)
+		for (i = 0; i < sl->qty; i++)
+			allium_scrub(sl->entry[i]->data, sl->entry[i]->mlen);
+
+	return (bstrListDestroy(sl));
 }
