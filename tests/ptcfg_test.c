@@ -52,6 +52,7 @@ static void ptcfg_or_port_test(void);
 static void ptcfg_ext_port_test(void);
 static void ptcfg_bind_addr_test(void);
 static void ptcfg_auth_cookie_file_test(void);
+static void ptcfg_server_xport_option_test(void);
 
 static void ptcfg_cmethod_report_test(void);
 static void ptcfg_smethod_report_test(void);
@@ -92,6 +93,9 @@ main(int argc, char *argv[])
 
 	sput_enter_suite("allium_ptcfg_auth_cookie_file(): Auth Cookie");
 	sput_run_test(ptcfg_auth_cookie_file_test);
+
+	sput_enter_suite("allium_ptcfg_server_xport_option(): Server Transport Options");
+	sput_run_test(ptcfg_server_xport_option_test);
 
 	sput_enter_suite("allium_ptcfg_cmethod_report(): Cmethod");
 	sput_run_test(ptcfg_cmethod_report_test);
@@ -407,6 +411,13 @@ ptcfg_init_server_test(void)
 	putenv("TOR_PT_SERVER_TRANSPORT_OPTIONS=");
 	cfg = allium_ptcfg_init();
 	sput_fail_unless(NULL != cfg, "cfg != NULL, Empty transport options");
+	if (cfg)
+		allium_ptcfg_free(cfg);
+
+	/* Blatantly broken server transport options */
+	putenv("TOR_PT_SERVER_TRANSPORT_OPTIONS=blorch");
+	cfg = allium_ptcfg_init();
+	sput_fail_unless(NULL == cfg, "cfg == NULL, Invalid transport options");
 	if (cfg)
 		allium_ptcfg_free(cfg);
 
@@ -813,6 +824,67 @@ ptcfg_auth_cookie_file_test(void)
 	rval = allium_ptcfg_auth_cookie_file(cfg, buf, &len);
 	sput_fail_unless(ALLIUM_ERR_PTCFG_NO_AUTH_COOKIE == rval,
 	    "rval == ALLIUM_ERR_PTCFG_NO_AUTH_COOKIE, No cookie");
+
+	allium_ptcfg_free(cfg);
+}
+
+
+static void
+ptcfg_server_xport_option_test(void)
+{
+	allium_ptcfg *cfg;
+	char buf[1024];
+	size_t len;
+	int rval;
+
+	ptcfg_test_server();
+	putenv("TOR_PT_SERVER_TRANSPORT_OPTIONS=foo:arg=123;bar:zzz=abc\\;;foo:bbb=zzz\\,\\\\\\;\\:\\=");
+	cfg = allium_ptcfg_init();
+
+	/* Invalid arguments */
+	len = sizeof(buf);
+	rval = allium_ptcfg_server_xport_option(NULL, "foo", "arg", buf, &len);
+	sput_fail_unless(ALLIUM_ERR_INVAL == rval,
+	    "rval == ALLIUM_ERR_INVAL, Invalid config");
+	rval = allium_ptcfg_server_xport_option(cfg, NULL, "arg", buf, &len);
+	sput_fail_unless(ALLIUM_ERR_INVAL == rval,
+	    "rval == ALLIUM_ERR_INVAL, Invalid method");
+	rval = allium_ptcfg_server_xport_option(cfg, "foo", NULL, buf, &len);
+	sput_fail_unless(ALLIUM_ERR_INVAL == rval,
+	    "rval == ALLIUM_ERR_INVAL, Invalid arg");
+	rval = allium_ptcfg_server_xport_option(cfg, "foo", "arg", buf, NULL);
+	sput_fail_unless(ALLIUM_ERR_INVAL == rval,
+	    "rval == ALLIUM_ERR_INVAL, Invalid length");
+	assert(cfg);
+
+	/* Buffer NULL/Too small */
+	len = sizeof(buf);
+	rval = allium_ptcfg_server_xport_option(cfg, "foo", "arg", NULL, &len);
+	sput_fail_unless(ALLIUM_ERR_NOBUFS == rval,
+	    "rval == ALLIUM_ERR_NOBUFS, NULL buffer");
+	sput_fail_unless(3 + 1 == len, "len == 3 + 1, NULL buffer");
+	len = 1; /* Something too short */
+	rval = allium_ptcfg_server_xport_option(cfg, "foo", "arg", buf, &len);
+	sput_fail_unless(ALLIUM_ERR_NOBUFS == rval,
+	    "rval == ALLIUM_ERR_NOBUFS, Length too small");
+	sput_fail_unless(3+ 1 == len, "len == 3 + 1, Length too small");
+
+	/* Valid arguments */
+	len = sizeof(buf);
+	rval = allium_ptcfg_server_xport_option(cfg, "foo", "arg", buf, &len);
+	sput_fail_unless(0 == rval, "rval == 0, Valid args");
+	sput_fail_unless(0 == strcmp(buf, "123"), "Correct value");
+	sput_fail_unless(len == strlen("123") + 1, "Correct length");
+	len = sizeof(buf);
+	rval = allium_ptcfg_server_xport_option(cfg, "foo", "bbb", buf, &len);
+	sput_fail_unless(0 == rval, "rval == 0, Valid args 2");
+	sput_fail_unless(0 == strcmp(buf, "zzz,\\;:="), "Correct value");
+	sput_fail_unless(len == strlen("zzz,\\;:=") + 1, "Correct length");
+
+	/* Missing argument */
+	len = sizeof(buf);
+	rval = allium_ptcfg_server_xport_option(cfg, "foo", "no_such_arg", buf, &len);
+	sput_fail_unless(ALLIUM_ERR_PTCFG_NO_XPORT_OPTION == rval, "Missing arg");
 
 	allium_ptcfg_free(cfg);
 }
