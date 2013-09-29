@@ -33,7 +33,7 @@ Notes:
 Known gotchas:
  * allium_ptcfg_state_dir()/allium_ptcfg_auth_cookie_file() will probably
    misbehave if the paths are non-ASCII.  This behavior is not considered a bug
-   as enviornment variable values are NULL terminated by definiton (See IEEE
+   as enviornment variable values are NULL terminated by definition (See IEEE
    Std. 1003.1 8.1).
  * liballium is slightly more strict than pt-spec.txt for the contents of
    PTCFG_SERVER_TRANSPORT_OPTIONS.  In particular, the "k" string is not
