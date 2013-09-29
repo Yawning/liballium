@@ -108,6 +108,7 @@ static struct allium_ptcfg_xport_opt_s *get_xport_opt(struct
     allium_ptcfg_method_s *method, const bstring key);
 static int parse_addr(const char *addr, struct sockaddr *out, socklen_t
     *out_len);
+static void unescape_opt_value(bstring str);
 static int bdestroy_safe(bstring str);
 static int bstrListDestroy_safe(struct bstrList *sl);
 
@@ -893,7 +894,7 @@ parse_server_xport_option(allium_ptcfg *cfg, const bstring arg_str)
 		bdestroy(key);
 		return (-1);
 	}
-	/* XXX: Unescape value: \, \\ \: \; \= */
+	unescape_opt_value(value);
 
 	/* Stash it away so people can get to it */
 	opt = calloc(1, sizeof(*opt));
@@ -946,6 +947,7 @@ static struct allium_ptcfg_xport_opt_s *get_xport_opt(struct
 	while (NULL != opt) {
 		if (1 == biseq(key, opt->key))
 			return (opt);
+
 		opt = opt->next;
 	}
 
@@ -1010,6 +1012,28 @@ parse_addr(const char *addr, struct sockaddr *out, socklen_t *out_len)
 }
 
 
+static void
+unescape_opt_value(bstring str)
+{
+	const struct tagbstring esc_comma = bsStatic("\\,");
+	const struct tagbstring comma = bsStatic(",");
+	const struct tagbstring esc_slash = bsStatic("\\\\");
+	const struct tagbstring slash = bsStatic("\\");
+	const struct tagbstring esc_colon = bsStatic("\\:");
+	const struct tagbstring colon = bsStatic(":");
+	const struct tagbstring esc_equals = bsStatic("\\=");
+	const struct tagbstring equals = bsStatic("=");
+
+	assert(str);
+
+	/* Unescape: \, \\ \: \; \= */
+	bfindreplace(str, &esc_comma, &comma, 0);
+	bfindreplace(str, &esc_slash, &slash, 0);
+	bfindreplace(str, &esc_colon, &colon, 0);
+	bfindreplace(str, &esc_equals, &equals, 0);
+}
+
+
 static int
 bdestroy_safe(bstring str)
 {
@@ -1026,8 +1050,12 @@ bstrListDestroy_safe(struct bstrList *sl)
 	int i;
 
 	if (NULL != sl)
-		for (i = 0; i < sl->qty; i++)
+		for (i = 0; i < sl->qty; i++) {
+			if (NULL == sl->entry[i]->data)
+				continue;
 			allium_scrub(sl->entry[i]->data, sl->entry[i]->mlen);
+		}
+
 
 	return (bstrListDestroy(sl));
 }
