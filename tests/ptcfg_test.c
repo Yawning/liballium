@@ -234,8 +234,7 @@ ptcfg_init_server_test(void)
 	clearenv();
 
 	/* Setup basic valid enviornment variables */
-	putenv("TOR_PT_MANAGED_TRANSPORT_VER=1");
-	putenv("TOR_PT_STATE_LOCATION=/tmp/my_sexy_pt");
+	ptcfg_test_server();
 
 	/* Empty server transport */
 	putenv("TOR_PT_SERVER_TRANSPORTS=");
@@ -253,20 +252,19 @@ ptcfg_init_server_test(void)
 
 	/* Valid server transport */
 	putenv("TOR_PT_SERVER_TRANSPORTS=foo");
+	putenv("TOR_PT_SERVER_BINDADDR=foo-127.0.0.1:69");
 	cfg = allium_ptcfg_init();
-	sput_fail_unless(NULL == cfg, "cfg == NULL, Valid server transport");
+	sput_fail_unless(NULL != cfg, "cfg != NULL, Valid server transport");
 	if (cfg)
 		allium_ptcfg_free(cfg);
 
 	/* Multiple server transports */
 	putenv("TOR_PT_SERVER_TRANSPORTS=foo,bar,baz");
+	putenv("TOR_PT_SERVER_BINDADDR=foo-127.0.0.1:69,bar-[::1]:23,baz-127.0.0.1:22");
 	cfg = allium_ptcfg_init();
-	sput_fail_unless(NULL == cfg, "cfg == NULL, 3 valid transports");
+	sput_fail_unless(NULL != cfg, "cfg != NULL, 3 valid transports");
 	if (cfg)
 		allium_ptcfg_free(cfg);
-
-	/* The ext/or ports tests don't care about the number of transports */
-	putenv("TOR_PT_SERVER_TRANSPORTS=foo");
 
 	/*
 	 * OR Port tests
@@ -297,7 +295,7 @@ ptcfg_init_server_test(void)
 	/* Valid IPv4 address */
 	putenv("TOR_PT_ORPORT=127.0.0.1:9001");
 	cfg = allium_ptcfg_init();
-	sput_fail_unless(NULL == cfg, "cfg == NULL, Valid IPv4 OR Port");
+	sput_fail_unless(NULL != cfg, "cfg != NULL, Valid IPv4 OR Port");
 	if (cfg)
 		allium_ptcfg_free(cfg);
 
@@ -311,7 +309,7 @@ ptcfg_init_server_test(void)
 	/* Valid IPv6 address */
 	putenv("TOR_PT_ORPORT=[::1]:9001");
 	cfg = allium_ptcfg_init();
-	sput_fail_unless(NULL == cfg, "cfg == NULL, Valid IPv6 OR Port");
+	sput_fail_unless(NULL != cfg, "cfg != NULL, Valid IPv6 OR Port");
 	if (cfg)
 		allium_ptcfg_free(cfg);
 
@@ -321,24 +319,24 @@ ptcfg_init_server_test(void)
 	 * parsed.
 	 */
 
-	/* Empty Ext Port */
+	/* Empty Ext Port (We are more forgiving than pt-spec.txt) */
 	putenv("TOR_PT_EXTENDED_SERVER PORT=");
 	cfg = allium_ptcfg_init();
-	sput_fail_unless(NULL == cfg, "cfg == NULL, Empty Ext Port");
+	sput_fail_unless(NULL != cfg, "cfg != NULL, Empty Ext Port");
 	if (cfg)
 		allium_ptcfg_free(cfg);
 
 	/* Valid IPv4 address */
 	putenv("TOR_PT_EXTENDED_SERVER_PORT=127.0.0.1:9002");
 	cfg = allium_ptcfg_init();
-	sput_fail_unless(NULL == cfg, "cfg == NULL, Valid IPv4 Ext Port");
+	sput_fail_unless(NULL != cfg, "cfg != NULL, Valid IPv4 Ext Port");
 	if (cfg)
 		allium_ptcfg_free(cfg);
 
 	/* Valid IPv6 address */
 	putenv("TOR_PT_EXTENDED_SERVER_PORT=[::1]:9002");
 	cfg = allium_ptcfg_init();
-	sput_fail_unless(NULL == cfg, "cfg == NULL, Valid IPv6 Ext Port");
+	sput_fail_unless(NULL != cfg, "cfg != NULL, Valid IPv6 Ext Port");
 	if (cfg)
 		allium_ptcfg_free(cfg);
 
@@ -368,6 +366,7 @@ ptcfg_init_server_test(void)
 		allium_ptcfg_free(cfg);
 
 	/* Valid address */
+	putenv("TOR_PT_SERVER_TRANSPORTS=foo");
 	putenv("TOR_PT_SERVER_BINDADDR=foo-127.0.0.1:69");
 	cfg = allium_ptcfg_init();
 	sput_fail_unless(NULL != cfg, "cfg != NULL, 1 Valid IPv4 address");
@@ -397,6 +396,24 @@ ptcfg_init_server_test(void)
 	putenv("TOR_PT_AUTH_COOKIE_FILE=/tmp/chcolate-chip");
 	cfg = allium_ptcfg_init();
 	sput_fail_unless(NULL != cfg, "cfg != NULL, Valid cookie");
+	if (cfg)
+		allium_ptcfg_free(cfg);
+
+	/*
+	 * Server transport options tests
+	 */
+
+	/* Empty server transport options */
+	putenv("TOR_PT_SERVER_TRANSPORT_OPTIONS=");
+	cfg = allium_ptcfg_init();
+	sput_fail_unless(NULL != cfg, "cfg != NULL, Empty transport options");
+	if (cfg)
+		allium_ptcfg_free(cfg);
+
+	/* Valid server transport option */
+	putenv("TOR_PT_SERVER_TRANSPORT_OPTIONS=foo:arg=123;bar:zzz=abc\\;;baz:bbb=231231");
+	cfg = allium_ptcfg_init();
+	sput_fail_unless(NULL != cfg, "cfg != NULL, Valid transport options");
 	if (cfg)
 		allium_ptcfg_free(cfg);
 }
