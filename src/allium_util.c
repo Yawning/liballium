@@ -36,7 +36,7 @@ allium_scrub(void *s, size_t n)
 	volatile unsigned char *p = s;
 
 	while (n--)
-		*p = '\0';
+		*p++ = '\0';
 
 	return s;
 }
