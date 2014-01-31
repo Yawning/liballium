@@ -518,6 +518,8 @@ allium_ptcfg_methods_done(const allium_ptcfg *cfg)
 	else
 		fprintf(stdout, "CMETHODS DONE\n");
 
+	fflush(stdout);
+
 	return (0);
 }
 
