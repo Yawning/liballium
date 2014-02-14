@@ -36,7 +36,7 @@
 #include <stdlib.h>
 #include <string.h>             /* For memset () */
 
-#include "allium.h"
+#include <allium/allium.h>
 
 
 #define METHOD_NAME		"trebuchet"

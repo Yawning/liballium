@@ -3,6 +3,31 @@
 *.o
 *.a
 
-# Ignore the directory I stash my cmake build files in
-/build
+# Ignore automake/autoconf/libtool generated files
+/Makefile
+/Makefile.in
+/aclocal.m4
+/autom4te.cache/
+/ar-lib
+/config.*
+/configure
+/compile
+/depcomp
+/install-sh
+/libtool
+/ltmain.sh
+/m4/
+/missing
+/stamp-h?
+/test-driver
+/test-suite.log
+.deps/
+.dirstamp
+.libs/
+*.l[ao]
+*.pc
 
+# Ignore unit test output if people do a in-tree build
+/ptcfg_test
+/ptcfg_test.log
+/ptcfg_test.trs
