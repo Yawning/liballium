@@ -8,8 +8,6 @@ Features:
  * Handles the runtime configuration of PT clients and servers
  * (TODO) Routines for talking to the transport control port
  * (TODO) Routines for talking to the extended OR port (including a traffic shaper)
- * (TODO) Routines for implementing a SOCKSv4/5 proxy server
- * (TODO) Various helper routines
 
 liballium embeds the following third party codebases:
  * Better String Library (safer string manipulation routines)
@@ -17,13 +15,10 @@ liballium embeds the following third party codebases:
 
 Specs implemented:
  * https://gitweb.torproject.org/torspec.git/blob/HEAD:/pt-spec.txt
- * (TODO) https://gitweb.torproject.org/torspec.git/blob/HEAD:/proposals/
-   196-transport-control-ports.txt
+ * (TODO) https://gitweb.torproject.org/torspec.git/blob/HEAD:/proposals/196-transport-control-ports.txt
 
 Notes:
  * Basic familiarity with the relevant Tor specs is assumed.
- * (TODO) Like 99% of the other SOCKSv5 implementations in the wild, liballium
-   does not and will not support GSSAPI authentication.
  * The code should work on Windows, however it is untested on that platform
    and most likely requires changes.  Patches accepted.
  * The Tor Pluggable Transport spec does not currently specify the format for
