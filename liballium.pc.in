@@ -8,4 +8,4 @@ Description: A C Tor Pluggable Transports Utility Library
 Version: @PACKAGE_VERSION@
 URL: @PACKAGE_URL@
 Libs: -L${libdir} -lallium-@ALLIUM_API_VERSION@
-Cflags: -I${includedir}/allium
+Cflags: -I${includedir}
