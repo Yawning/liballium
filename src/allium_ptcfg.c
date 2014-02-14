@@ -25,6 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <netinet/in.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

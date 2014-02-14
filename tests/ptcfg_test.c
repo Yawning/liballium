@@ -196,7 +196,7 @@ ptcfg_init_client_test(void)
 
 	clearenv();
 
-	/* Setup basic valid enviornment variables */
+	/* Setup basic valid environment variables */
 	putenv("TOR_PT_MANAGED_TRANSPORT_VER=1");
 	putenv("TOR_PT_STATE_LOCATION=/tmp/my_sexy_pt");
 
@@ -237,7 +237,7 @@ ptcfg_init_server_test(void)
 
 	clearenv();
 
-	/* Setup basic valid enviornment variables */
+	/* Setup basic valid environment variables */
 	ptcfg_test_server();
 
 	/* Empty server transport */
