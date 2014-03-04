@@ -26,6 +26,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <netinet/in.h>
 #include <arpa/inet.h>
 
 #include <stdio.h>
@@ -37,6 +38,8 @@
 
 #include "allium.h"
 #include "sput.h"
+
+static void ptcfg_clearenv(void);
 
 static void ptcfg_test_client(void);
 static void ptcfg_test_server(void);
@@ -116,9 +119,25 @@ main(int argc, char *argv[])
 
 
 static void
+ptcfg_clearenv(void)
+{
+	unsetenv("TOR_PT_MANAGED_TRANSPORT_VER");
+	unsetenv("TOR_PT_STATE_LOCATION");
+	unsetenv("TOR_PT_CLIENT_TRANSPORTS");
+	unsetenv("TOR_PT_MANAGED_TRANSPORT_VER");
+	unsetenv("TOR_PT_STATE_LOCATION");
+	unsetenv("TOR_PT_SERVER_TRANSPORTS");
+	unsetenv("TOR_PT_ORPORT");
+	unsetenv("TOR_PT_EXTENDED_SERVER_PORT");
+	unsetenv("TOR_PT_SERVER_BINDADDR");
+	unsetenv("TOR_PT_AUTH_COOKIE_FILE");
+}
+
+
+static void
 ptcfg_test_client(void)
 {
-	clearenv();
+	ptcfg_clearenv();
 	putenv("TOR_PT_MANAGED_TRANSPORT_VER=1");
 	putenv("TOR_PT_STATE_LOCATION=/tmp/my_sexy_pt");
 	putenv("TOR_PT_CLIENT_TRANSPORTS=foo,bar,baz");
@@ -128,7 +147,7 @@ ptcfg_test_client(void)
 static void
 ptcfg_test_server(void)
 {
-	clearenv();
+	ptcfg_clearenv();
 	putenv("TOR_PT_MANAGED_TRANSPORT_VER=1");
 	putenv("TOR_PT_STATE_LOCATION=/tmp/my_sexy_pt");
 	putenv("TOR_PT_SERVER_TRANSPORTS=foo,bar,baz");
@@ -144,7 +163,7 @@ ptcfg_init_noargs_test(void)
 {
 	allium_ptcfg *cfg;
 
-	clearenv();
+	ptcfg_clearenv();
 
 	/* No env vars at all */
 	cfg = allium_ptcfg_init();
@@ -194,7 +213,7 @@ ptcfg_init_client_test(void)
 {
 	allium_ptcfg *cfg;
 
-	clearenv();
+	ptcfg_clearenv();
 
 	/* Setup basic valid environment variables */
 	putenv("TOR_PT_MANAGED_TRANSPORT_VER=1");
@@ -235,7 +254,7 @@ ptcfg_init_server_test(void)
 {
 	allium_ptcfg *cfg;
 
-	clearenv();
+	ptcfg_clearenv();
 
 	/* Setup basic valid environment variables */
 	ptcfg_test_server();
@@ -485,7 +504,7 @@ ptcfg_is_server_test(void)
 	allium_ptcfg *cfg;
 	int rval;
 
-	clearenv();
+	ptcfg_clearenv();
 
 	/* Invalid arguments */
 	rval = allium_ptcfg_is_server(NULL);
