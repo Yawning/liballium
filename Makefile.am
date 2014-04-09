@@ -6,7 +6,7 @@
 AUTOMAKE_OPTIONS = subdir-objects
 ACLOCAL_AMFLAGS = ${ACLOCAL_FLAGS} -I m4
 
-AM_CFLAGS = -Wall -Werror -O2
+AM_CFLAGS = -Wall -Werror -Wextra
 
 lib_LTLIBRARIES = liballium-@ALLIUM_API_VERSION@.la
 
