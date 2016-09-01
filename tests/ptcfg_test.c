@@ -583,11 +583,13 @@ ptcfg_or_port_test(void)
 	assert(cfg);
 
 	memset(&cmp_v4addr, 0, sizeof(cmp_v4addr));
+	cmp_v4addr.sin_len = sizeof(cmp_v4addr);
 	cmp_v4addr.sin_family = AF_INET;
 	cmp_v4addr.sin_port = htons(9001);
 	inet_pton(AF_INET, "127.0.0.1", &cmp_v4addr.sin_addr);
 
 	memset(&cmp_v6addr, 0, sizeof(cmp_v6addr));
+	cmp_v6addr.sin6_len = sizeof(cmp_v6addr);
 	cmp_v6addr.sin6_family = AF_INET6;
 	cmp_v6addr.sin6_port = htons(9001);
 	inet_pton(AF_INET6, "::1", &cmp_v6addr.sin6_addr);
@@ -652,11 +654,13 @@ ptcfg_ext_port_test(void)
 	assert(cfg);
 
 	memset(&cmp_v4addr, 0, sizeof(cmp_v4addr));
+	cmp_v4addr.sin_len = sizeof(cmp_v4addr);
 	cmp_v4addr.sin_family = AF_INET;
 	cmp_v4addr.sin_port = htons(9002);
 	inet_pton(AF_INET, "127.0.0.1", &cmp_v4addr.sin_addr);
 
 	memset(&cmp_v6addr, 0, sizeof(cmp_v6addr));
+	cmp_v6addr.sin6_len = sizeof(cmp_v6addr);
 	cmp_v6addr.sin6_family = AF_INET6;
 	cmp_v6addr.sin6_port = htons(9002);
 	inet_pton(AF_INET6, "::1", &cmp_v6addr.sin6_addr);
@@ -731,11 +735,13 @@ ptcfg_bind_addr_test(void)
 	ptcfg_test_server();
 
 	memset(&cmp_v4addr, 0, sizeof(cmp_v4addr));
+	cmp_v4addr.sin_len = sizeof(cmp_v4addr);
 	cmp_v4addr.sin_family = AF_INET;
 	cmp_v4addr.sin_port = htons(69);
 	inet_pton(AF_INET, "127.0.0.1", &cmp_v4addr.sin_addr);
 
 	memset(&cmp_v6addr, 0, sizeof(cmp_v6addr));
+	cmp_v6addr.sin6_len = sizeof(cmp_v6addr);
 	cmp_v6addr.sin6_family = AF_INET6;
 	cmp_v6addr.sin6_port = htons(23);
 	inet_pton(AF_INET6, "::1", &cmp_v6addr.sin6_addr);
